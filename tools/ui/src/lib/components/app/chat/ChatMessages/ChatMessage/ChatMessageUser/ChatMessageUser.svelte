@@ -71,11 +71,16 @@
 	});
 
 	let showStoredReadingStats = $derived(
-		Boolean(currentConfig.showMessageStats) && storedReadingStats !== null
+		Boolean(currentConfig.showMessageStats) &&
+			Boolean(currentConfig.showPromptStats) &&
+			storedReadingStats !== null
 	);
 
 	let showLiveReadingStats = $derived(
-		Boolean(currentConfig.showMessageStats) && isActivelyProcessing && storedReadingStats === null
+		Boolean(currentConfig.showMessageStats) &&
+			Boolean(currentConfig.showPromptStats) &&
+			isActivelyProcessing &&
+			storedReadingStats === null
 	);
 
 	$effect(() => {

@@ -237,15 +237,24 @@ const SETTINGS_REGISTRY: Record<string, SettingsSectionEntry> = {
 		settings: [
 			{
 				key: SETTINGS_KEYS.SHOW_MESSAGE_STATS,
-				label: 'Show message generation statistics',
+				label: 'Show response generation statistics',
 				help: 'Display generation statistics (tokens/second, token count, duration) below each assistant message.',
-				defaultValue: false,
+				defaultValue: true,
 				type: SettingsFieldType.CHECKBOX,
 				section: SETTINGS_SECTION_SLUGS.DISPLAY,
 				sync: {
 					serverKey: SETTINGS_KEYS.SHOW_MESSAGE_STATS,
 					paramType: SyncableParameterType.BOOLEAN
 				}
+			},
+			{
+				key: SETTINGS_KEYS.SHOW_PROMPT_STATS,
+				label: 'Show prompt processing statistics',
+				help: 'Display prompt processing statistics (tokens/second, token count, duration) below each user message.',
+				defaultValue: false,
+				type: SettingsFieldType.CHECKBOX,
+				section: SETTINGS_SECTION_SLUGS.DISPLAY,
+				dependsOn: SETTINGS_KEYS.SHOW_MESSAGE_STATS
 			},
 			{
 				key: SETTINGS_KEYS.SHOW_AGENTIC_TURN_STATS,

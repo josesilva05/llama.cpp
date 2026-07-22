@@ -20,6 +20,7 @@ export const SETTINGS_KEYS = {
 	MAX_IMAGE_RESOLUTION: 'maxImageMPixels',
 	// Display
 	SHOW_MESSAGE_STATS: 'showMessageStats',
+	SHOW_PROMPT_STATS: 'showPromptStats',
 	SHOW_AGENTIC_TURN_STATS: 'showAgenticTurnStats',
 	SHOW_THOUGHT_IN_PROGRESS: 'showThoughtInProgress',
 	AUTO_MIC_ON_EMPTY: 'autoMicOnEmpty',
