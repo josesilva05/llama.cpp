@@ -2707,6 +2707,9 @@ struct llama_model_inkling2_loop : public llama_model_inkling2 {
     int n_layer_phys() const override { return n_phys; }
     int layer_phys(int il) const;
 
+    int n_layer_split(int) const override { return n_phys; }
+    int layer_split_index(int il) const override { return layer_phys(il); }
+
     int      n_phys     = 0;
     uint32_t core_start = 0;
     uint32_t core_end   = 0;

@@ -3165,18 +3165,11 @@ ggml_tensor * llm_graph_context::build_attn_mha(
     k = ggml_permute(ctx0, k, 0, 2, 1, 3);
     v = ggml_permute(ctx0, v, 0, 2, 1, 3);
 
+    // a mask per head for the devices without the indexed bias: gathered, summed and converted in one pass,
+    // without an F32 copy of the n_kv x n_tokens x n_head bias
     auto dense_bias_mask = [&]() {
-        ggml_tensor * table = ggml_cont(ctx0, ggml_permute(ctx0, bias_table, 1, 0, 2, 3));
-        ggml_tensor * bias = ggml_get_rows(ctx0, table, bias_indices);
-        bias = ggml_reshape_4d(ctx0, bias, q->ne[2], bias_indices->ne[0], q->ne[1], n_stream);
-        bias = ggml_cont(ctx0, ggml_permute(ctx0, bias, 2, 0, 1, 3));
-        cb(bias, "kq_b", il);
-
-        ggml_tensor * mask = kq_mask->type == GGML_TYPE_F32 ? kq_mask : ggml_cast(ctx0, kq_mask, GGML_TYPE_F32);
-        mask = ggml_add(ctx0, bias, mask);
-        if (cparams.flash_attn) {
-            mask = ggml_cast(ctx0, mask, GGML_TYPE_F16);
-        }
+        ggml_tensor * mask = ggml_rel_bias_mask(ctx0, bias_table, bias_indices, kq_mask,
+                cparams.flash_attn ? GGML_TYPE_F16 : GGML_TYPE_F32);
         cb(mask, "kq_mask_rel_pos", il);
         return mask;
     };

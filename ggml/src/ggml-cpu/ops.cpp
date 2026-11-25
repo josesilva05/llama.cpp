@@ -12715,3 +12715,48 @@ void ggml_compute_forward_lightning_indexer(
         }
     }
 }
+
+// ggml_compute_forward_rel_bias_mask
+
+void ggml_compute_forward_rel_bias_mask(
+        const ggml_compute_params * params,
+        ggml_tensor * dst) {
+    const ggml_tensor * table   = dst->src[0];
+    const ggml_tensor * rel_pos = dst->src[1];
+    const ggml_tensor * mask    = dst->src[2];
+
+    const int64_t n_kv   = dst->ne[0];
+    const int64_t n_tok  = dst->ne[1];
+    const int64_t n_head = dst->ne[2];
+    const int64_t n_dist = table->ne[0];
+    const int64_t n_rows = n_tok*dst->ne[3];
+
+    const bool mask_f16 = mask->type == GGML_TYPE_F16;
+    const bool dst_f16  = dst->type  == GGML_TYPE_F16;
+
+    // one (token, stream) per task: its distances and mask row are shared by the heads
+    for (int64_t ir = params->ith; ir < n_rows; ir += params->nth) {
+        const int64_t t = ir % n_tok;
+        const int64_t s = ir / n_tok;
+        const int64_t u = s*n_tok + t;
+
+        const int32_t * rel_row  = (const int32_t *) ((const char *) rel_pos->data + u*rel_pos->nb[1]);
+        const char    * mask_row = (const char *) mask->data + t*mask->nb[1] + s*mask->nb[3];
+
+        for (int64_t h = 0; h < n_head; ++h) {
+            const float * tab = (const float *) ((const char *) table->data + h*table->nb[1] + u*table->nb[2]);
+            char * dst_row = (char *) dst->data + t*dst->nb[1] + h*dst->nb[2] + s*dst->nb[3];
+
+            for (int64_t c = 0; c < n_kv; ++c) {
+                const int32_t d = std::min<int32_t>(std::max<int32_t>(rel_row[c], 0), (int32_t) n_dist - 1);
+                const float   m = mask_f16 ? GGML_CPU_FP16_TO_FP32(((const ggml_fp16_t *) mask_row)[c]) : ((const float *) mask_row)[c];
+                const float   v = tab[d] + m;
+                if (dst_f16) {
+                    ((ggml_fp16_t *) dst_row)[c] = GGML_CPU_FP32_TO_FP16(v);
+                } else {
+                    ((float *) dst_row)[c] = v;
+                }
+            }
+        }
+    }
+}
