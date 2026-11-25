@@ -1086,6 +1086,11 @@ struct llama_model {
     // graph size budget: max graph nodes per model tensor
     virtual uint32_t graph_nodes_per_tensor() const { return 8; }
 
+    // models whose layer slots share the weights of fewer physical layers (looped models) split the devices
+    // over the physical layers, and each slot follows its physical layer so its KV and state stay with its weights
+    virtual int n_layer_split(int n_layer_all) const { return n_layer_all; }
+    virtual int layer_split_index(int il) const { return il; }
+
     // apply Hadamard transform to the lightning indexer keys
     virtual bool lid_k_hdmd() const { return false; }
 
