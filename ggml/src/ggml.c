@@ -1099,6 +1099,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "DSV4_HC_PRE",
     "DSV4_HC_POST",
     "TOP_K_MASK",
+    "REL_BIAS_MASK",
 
     "UNARY",
 
@@ -1120,7 +1121,7 @@ static const char * GGML_OP_NAME[GGML_OP_COUNT] = {
     "SIGMOID_BACK",
 };
 
-static_assert(GGML_OP_COUNT == 101, "GGML_OP_COUNT != 101");
+static_assert(GGML_OP_COUNT == 102, "GGML_OP_COUNT != 102");
 
 static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "none",
@@ -1216,6 +1217,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "dsv4_hc_pre(x, weights)",
     "dsv4_hc_post(x, residual, post, comb)",
     "top_k_mask(mask, top_k, score, blocks, extra)",
+    "rel_bias_mask(table, rel_pos, mask)",
 
     "unary(x)",
 
@@ -1237,7 +1239,7 @@ static const char * GGML_OP_SYMBOL[GGML_OP_COUNT] = {
     "sigmoid_back(x)",
 };
 
-static_assert(GGML_OP_COUNT == 101, "GGML_OP_COUNT != 101");
+static_assert(GGML_OP_COUNT == 102, "GGML_OP_COUNT != 102");
 
 static_assert(GGML_OP_POOL_COUNT == 2, "GGML_OP_POOL_COUNT != 2");
 
@@ -6713,6 +6715,35 @@ struct ggml_tensor * ggml_top_k_mask(
     result->src[2] = score;
     result->src[3] = blocks;
     result->src[4] = extra;
+
+    return result;
+}
+
+// ggml_rel_bias_mask
+
+struct ggml_tensor * ggml_rel_bias_mask(
+        struct ggml_context * ctx,
+        struct ggml_tensor  * table,
+        struct ggml_tensor  * rel_pos,
+        struct ggml_tensor  * mask,
+        enum   ggml_type      type) {
+    GGML_ASSERT(table->type   == GGML_TYPE_F32);
+    GGML_ASSERT(rel_pos->type == GGML_TYPE_I32);
+    GGML_ASSERT(mask->type == GGML_TYPE_F16 || mask->type == GGML_TYPE_F32);
+    GGML_ASSERT(type       == GGML_TYPE_F16 || type       == GGML_TYPE_F32);
+    GGML_ASSERT(table->ne[3] == 1 && rel_pos->ne[2] == 1 && rel_pos->ne[3] == 1 && mask->ne[2] == 1);
+    GGML_ASSERT(table->nb[0] == sizeof(float) && rel_pos->nb[0] == sizeof(int32_t) && mask->nb[0] == ggml_type_size(mask->type));
+    GGML_ASSERT(rel_pos->ne[0] == mask->ne[0]);
+    GGML_ASSERT(table->ne[2] == rel_pos->ne[1]);
+    GGML_ASSERT(mask->ne[1]*mask->ne[3] == rel_pos->ne[1]);
+
+    const int64_t ne[4] = { mask->ne[0], mask->ne[1], table->ne[1], mask->ne[3] };
+    struct ggml_tensor * result = ggml_new_tensor(ctx, type, 4, ne);
+
+    result->op     = GGML_OP_REL_BIAS_MASK;
+    result->src[0] = table;
+    result->src[1] = rel_pos;
+    result->src[2] = mask;
 
     return result;
 }

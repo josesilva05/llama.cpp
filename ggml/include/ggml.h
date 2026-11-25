@@ -415,6 +415,7 @@ extern "C" {
         GGML_OP_DSV4_HC_PRE,
         GGML_OP_DSV4_HC_POST,
         GGML_OP_TOP_K_MASK,
+        GGML_OP_REL_BIAS_MASK,
 
         GGML_OP_UNARY,
 
@@ -2559,6 +2560,23 @@ extern "C" {
             struct ggml_tensor  * score,
             struct ggml_tensor  * blocks,
             struct ggml_tensor  * extra);
+
+    // attention mask per head with a relative-position bias gathered by distance
+    //
+    // table:   [n_dist, n_head, n_tokens]             f32, bias of each distance bucket per head and token
+    // rel_pos: [n_kv,   n_tokens]                     i32, distance bucket of each KV cell per token
+    // mask:    [n_kv,   n_tokens/n_stream, 1, n_stream] f16 or f32
+    // res:     [n_kv,   n_tokens/n_stream, n_head, n_stream] of the given type (f16 or f32)
+    //
+    // res[c, t, h, s] = table[rel_pos[c, u], h, u] + mask[c, t, 0, s], with u = s*(n_tokens/n_stream) + t
+    // the sum is done in f32; buckets out of range are clamped
+    //
+    GGML_API struct ggml_tensor * ggml_rel_bias_mask(
+            struct ggml_context * ctx,
+            struct ggml_tensor  * table,
+            struct ggml_tensor  * rel_pos,
+            struct ggml_tensor  * mask,
+            enum   ggml_type      type);
 
     // custom operators
 

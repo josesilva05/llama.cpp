@@ -10331,6 +10331,93 @@ struct test_lightning_indexer : public test_case {
     }
 };
 
+// GGML_OP_REL_BIAS_MASK
+struct test_rel_bias_mask : public test_case {
+    const ggml_type type_mask;
+    const ggml_type type_dst;
+    const int64_t n_kv;
+    const int64_t n_dist;
+    const int64_t n_head;
+    const int64_t n_tok; // tokens per stream
+    const int64_t n_stream;
+
+    std::string vars() override {
+        return VARS_TO_STR7(type_mask, type_dst, n_kv, n_dist, n_head, n_tok, n_stream);
+    }
+
+    // both backends sum in f32 and round once, the finite values must match; the harness checks the -inf pattern
+    double max_err() override {
+        return 1e-6;
+    }
+
+    double err(const float * a, const float * b, size_t n) override {
+        double result = 0.0;
+        for (size_t i = 0; i < n; ++i) {
+            if (std::isfinite(a[i]) && std::isfinite(b[i])) {
+                result = std::max(result, (double) fabsf(a[i] - b[i]));
+            }
+        }
+        return result;
+    }
+
+    test_rel_bias_mask(ggml_type type_mask = GGML_TYPE_F16, ggml_type type_dst = GGML_TYPE_F16,
+            int64_t n_kv = 256, int64_t n_dist = 17, int64_t n_head = 4, int64_t n_tok = 8, int64_t n_stream = 1)
+        : type_mask(type_mask), type_dst(type_dst), n_kv(n_kv), n_dist(n_dist), n_head(n_head), n_tok(n_tok), n_stream(n_stream) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * table = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, n_dist, n_head, n_tok*n_stream);
+        ggml_set_name(table, "table");
+
+        ggml_tensor * rel_pos = ggml_new_tensor_2d(ctx, GGML_TYPE_I32, n_kv, n_tok*n_stream);
+        ggml_set_name(rel_pos, "rel_pos");
+
+        ggml_tensor * mask = ggml_new_tensor_4d(ctx, type_mask, n_kv, n_tok, 1, n_stream);
+        ggml_set_name(mask, "mask");
+
+        ggml_tensor * out = ggml_rel_bias_mask(ctx, table, rel_pos, mask, type_dst);
+        ggml_set_name(out, "out");
+
+        return out;
+    }
+
+    void initialize_tensors(ggml_context * ctx) override {
+        std::mt19937 gen(0x52424D);
+        std::uniform_real_distribution<float> uval(-4.0f, 4.0f);
+
+        for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != nullptr; t = ggml_get_next_tensor(ctx, t)) {
+            const int64_t n = ggml_nelements(t);
+            if (strcmp(t->name, "rel_pos") == 0) {
+                // buckets out of range are clamped
+                std::uniform_int_distribution<int32_t> ud(-2, (int32_t) n_dist + 2);
+                std::vector<int32_t> data(n);
+                for (auto & v : data) {
+                    v = ud(gen);
+                }
+                ggml_backend_tensor_set(t, data.data(), 0, n*sizeof(int32_t));
+            } else if (strcmp(t->name, "mask") == 0) {
+                // a causal-like mix of open and masked cells
+                std::vector<float> data(n);
+                for (int64_t i = 0; i < n; ++i) {
+                    data[i] = (gen() % 4 == 0) ? -INFINITY : uval(gen);
+                }
+                if (t->type == GGML_TYPE_F16) {
+                    std::vector<ggml_fp16_t> h(n);
+                    ggml_fp32_to_fp16_row(data.data(), h.data(), n);
+                    ggml_backend_tensor_set(t, h.data(), 0, n*sizeof(ggml_fp16_t));
+                } else {
+                    ggml_backend_tensor_set(t, data.data(), 0, n*sizeof(float));
+                }
+            } else if (t->type == GGML_TYPE_F32) {
+                std::vector<float> data(n);
+                for (auto & v : data) {
+                    v = uval(gen);
+                }
+                ggml_backend_tensor_set(t, data.data(), 0, n*sizeof(float));
+            }
+        }
+    }
+};
+
 // GGML_OP_TOP_K_MASK
 struct test_top_k_mask : public test_case {
     const ggml_type type;
@@ -11292,6 +11379,14 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
         // one mask row for all rows and streams (QSA)
         test_cases.emplace_back(new test_top_k_mask(type, 1001, 4, 70, 16, 3, true, 7, 1, 1, false, true));
         test_cases.emplace_back(new test_top_k_mask(type, 512, 8, 16, 32, 7, true, 5, 1, 4, false, true));
+    }
+
+    for (ggml_type type_mask : {GGML_TYPE_F16, GGML_TYPE_F32}) {
+        for (ggml_type type_dst : {GGML_TYPE_F16, GGML_TYPE_F32}) {
+            test_cases.emplace_back(new test_rel_bias_mask(type_mask, type_dst));
+            test_cases.emplace_back(new test_rel_bias_mask(type_mask, type_dst, 1000, 1025, 24, 7, 1));
+            test_cases.emplace_back(new test_rel_bias_mask(type_mask, type_dst, 300, 9, 3, 5, 3));
+        }
     }
 
     // glu ops
