@@ -266,7 +266,6 @@ ggml_tensor * llama_model_inkling2::graph::control(ggml_tensor * cur, ggml_tenso
 
 ggml_tensor * llama_model_inkling2::graph::build_inputs() {
     inp  = build_inp_mem_hybrid_iswa_rel(hparams.n_relative_extent, hparams.n_swa);
-    attn = inp->get_attn();
     recr = inp->get_recr();
 
     ggml_tensor * inp_pos = build_inp_pos();
@@ -365,13 +364,10 @@ ggml_tensor * llama_model_inkling2::graph::build_layer(int il, int ip, ggml_tens
 
         ggml_tensor * sinks = build_lora_mm(layer.attn_sink_proj, inputs[0]);
 
-        // project r on the bias table: [n_extent + 1, n_head, n_tokens], the last bucket is past the extent;
-        // build_attn gathers it by distance into the mask per head
         ggml_tensor * table = ggml_mul_mat(ctx0, ggml_pad(ctx0, layer.attn_rel_bias, 0, 1, 0, 0), Rcur);
 
         // the sink logit t is per query: exp(s - t)/(1 + sum(exp(s - t))) = exp(s)/(exp(t) + sum(exp(s))), with a zero sink
         table = ggml_sub(ctx0, table, ggml_reshape_3d(ctx0, sinks, 1, n_head, n_tokens));
-        cb(table, "rel_bias", il);
 
         // one zero tensor per head count for the whole graph
         ggml_tensor *& zero = zero_sinks[n_head];

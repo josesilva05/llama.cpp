@@ -246,13 +246,21 @@ export const SETTINGS_REGISTRY: SettingsSectionEntry[] = [
 				defaultValue: true,
 				help: 'Display generation statistics (tokens/second, token count, duration) below each assistant message.',
 				key: SETTINGS_KEYS.SHOW_MESSAGE_STATS,
-				label: 'Show message generation statistics',
+				label: 'Show response generation statistics',
 				type: SettingsFieldType.CHECKBOX
 			},
 			{
 				defaultValue: false,
 				dependsOn: SETTINGS_KEYS.SHOW_MESSAGE_STATS,
-				help: 'Display per-turn statistics (tokens, duration) under each turn in agentic responses. Shown only when "Show message generation statistics" is enabled.',
+				help: 'Display prompt processing statistics (tokens/second, token count, duration) below each user message.',
+				key: SETTINGS_KEYS.SHOW_PROMPT_STATS,
+				label: 'Show prompt processing statistics',
+				type: SettingsFieldType.CHECKBOX
+			},
+			{
+				defaultValue: false,
+				dependsOn: SETTINGS_KEYS.SHOW_MESSAGE_STATS,
+				help: 'Display per-turn statistics (tokens, duration) under each turn in agentic responses. Shown only when "Show response generation statistics" is enabled.',
 				key: SETTINGS_KEYS.SHOW_AGENTIC_TURN_STATS,
 				label: 'Show statistics for individual agentic turns',
 				type: SettingsFieldType.CHECKBOX

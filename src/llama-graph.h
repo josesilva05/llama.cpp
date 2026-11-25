@@ -1349,7 +1349,9 @@ struct llm_graph_context {
             ggml_tensor * v_mla,   // [n_embd_head_v_mla, n_embd_head_v, n_head_v]
                 int64_t   n_kv_max,
                   float   kq_scale,
-                    int   il) const;
+                    int   il,
+            ggml_tensor * bias_table = nullptr,   // [n_bins, n_head_q, n_tokens]
+            ggml_tensor * bias_indices = nullptr) const;
 
     llm_graph_input_attn_no_cache * build_attn_inp_no_cache() const;
 
@@ -1547,17 +1549,15 @@ struct llm_graph_context {
             uint32_t extent,
             uint32_t extent_swa) const;
 
-    // the bias of each distance bucket is gathered by the distance of each KV cell and added to the KQ mask,
-    // after the KQ scale; distances at or past the extent take the last bucket
     ggml_tensor * build_attn(
             llm_graph_input_mem_hybrid_iswa_rel * inp,
             ggml_tensor * wo,
             ggml_tensor * wo_b,
             ggml_tensor * wo_s,
-            ggml_tensor * q_cur,    // [n_embd_head_q, n_head_q, n_tokens]
-            ggml_tensor * k_cur,    // [n_embd_head_k, n_head_k, n_tokens]
-            ggml_tensor * v_cur,    // [n_embd_head_v, n_head_v, n_tokens]
-            ggml_tensor * rel_bias, // [n_extent + 1, n_head_q, n_tokens]
+            ggml_tensor * q_cur, // [n_embd_head_q, n_head_q, n_tokens]
+            ggml_tensor * k_cur, // [n_embd_head_k, n_head_k, n_tokens]
+            ggml_tensor * v_cur, // [n_embd_head_v, n_head_v, n_tokens]
+            ggml_tensor * bias_table, // [n_bins, n_head_q, n_tokens]
             ggml_tensor * sinks, // [n_head_q]
                   float   kq_scale,
                     int   il) const;
